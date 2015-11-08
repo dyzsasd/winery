@@ -109,12 +109,14 @@ def main():
 
 def _crawl(addr):
     components = addr.split('/')
+    print addr
     if len(components) > 3:
         rub = components[3]
         task = None
         if rub == 'wineries':
             task = WineryTask(addr)
-        elif rub == 
+        if task:
+            task.get()
 
 
 
