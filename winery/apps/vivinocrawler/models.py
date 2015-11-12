@@ -14,7 +14,7 @@ class BaseDocument(mongoengine.Document):
     created_at = fields.DateTimeField()
     updated_at = fields.DateTimeField()
 
-
+    meta = {'allow_inheritance': True}
 
     def save(self, **kwargs):
         """Save the document in database.

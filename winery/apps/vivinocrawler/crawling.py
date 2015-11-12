@@ -1,8 +1,9 @@
 import gzip
+import hashlib
 import urllib2
 from StringIO import StringIO
 
-import lxml.etree
+from lxml import etree
 import lxml.html as lh
 
 from winery.apps.vivinocrawler.models import Win
@@ -88,35 +89,56 @@ def _compose_parse(addr, href):
     return HASHER.hexdigest()
 
 
+rubs = {}
+
+
 def main():
     nsp = {'sitemap':'http://www.sitemaps.org/schemas/sitemap/0.9'}
     top_map = urllib2.urlopen(SITE_MAP_ADDR).read()
     tree = etree.fromstring(top_map)
     locs = tree.xpath('//sitemap:loc', namespaces=nsp)
+    print 'Get %d sitmaps' % len(locs)
+    count = 0
     for loc in locs:
+        print 'crawling sitmap %d with %s' % (count, loc.text)
         request = urllib2.Request(loc.text)
         request.add_header('Accept-encoding', 'gzip')
-        response = urllib2.urlopen(request)
-        if response.info().get('Content-Encoding') == 'gzip':
-            buf = StringIO( response.read())
-            f = gzip.GzipFile(fileobj=buf)
-            data = f.read()
+        try:
+            response = urllib2.urlopen(request)
+        except Exception as e:
+            print e
+            continue
+        if 'gzip' in response.info().get('Content-Type'):
+            try:
+                buf = StringIO(response.read())
+                f = gzip.GzipFile(fileobj=buf)
+                data = f.read()
+            except Exception as e:
+                print e
+                continue
             url_tree = etree.fromstring(data)
+            print 'get %d page urls' % len(url_tree.getchildren())
             for url in url_tree.getchildren():
                 for url_loc in url.xpath('sitemap:loc', namespaces=nsp):
                     addr = url_loc.text
                     _crawl(addr)
+        count += 1
+        print rubs
+    print rubs
+
 
 def _crawl(addr):
     components = addr.split('/')
-    print addr
     if len(components) > 3:
         rub = components[3]
+        if rub not in rubs:
+            rubs[rub] = 0
+        rubs[rub] += 1
         task = None
-        if rub == 'wineries':
-            task = WineryTask(addr)
-        if task:
-            task.get()
+#        if rub == 'wineries':
+#            task = WineryTask(addr)
+#        if task:
+#            task.get()
 
 
 
