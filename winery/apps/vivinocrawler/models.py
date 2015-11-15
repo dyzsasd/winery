@@ -5,8 +5,8 @@ from django.db.models import signals
 import mongoengine
 from mongoengine import fields
 
-
 HASHER = hashlib.md5()
+
 
 class BaseDocument(mongoengine.Document):
     url = fields.StringField(required=True)
@@ -14,12 +14,16 @@ class BaseDocument(mongoengine.Document):
     created_at = fields.DateTimeField()
     updated_at = fields.DateTimeField()
 
-    meta = {'allow_inheritance': True}
+    meta = {
+        'abstract': True,
+        'allow_inheritance': True,
+    }
 
     def save(self, **kwargs):
         """Save the document in database.
         Sends `pre_save` and `post_save` signals, and sets `created_at` and
         `updated_at` as needed.
+        Use md5 hash as document key.
         """
 
         signals.pre_save.send(sender=self.__class__, instance=self)
@@ -29,6 +33,8 @@ class BaseDocument(mongoengine.Document):
             # so the value on the saved model is the same as in
             # the MongoDB database.
             self.created_at = datetime.utcnow()
+            HASHER.update(self.url)
+            _id = HASHER.hexdigest()
         self.updated_at = datetime.utcnow()
         result = super(BaseDocument, self).save(**kwargs)
         after = 'pk' in self and self.pk or None
@@ -69,53 +75,67 @@ class BaseDocument(mongoengine.Document):
 
 
 class BaseRegion(BaseDocument):
+
+    meta = {
+        'abstract': True,
+        'allow_inheritance': True,
+    }
+
     name = fields.StringField(required=True)
-    google_address = fields.StringField(default=lambda: "")
-    description = fields.StringField()
+    geo_query = fields.StringField(default=lambda: "")
+    description = fields.StringField(default=lambda: "")
 
 
 class Country(BaseRegion):
-    sub_regions_count = fields.IntField()
-    wineries_count = fields.IntField()
-    wins_count = fields.IntField()
+    pass
 
 
 class Region(BaseRegion):
-    country = fields.StringField()
-    parent_region = fields.StringField()
-    sub_regions_count = fields.IntField()
-    wineries_count = fields.IntField()
-    wins_count = fields.IntField()
+    country_name = fields.StringField()
+    country_id = fields.StringField()
+    parent_name = fields.StringField()
+    parent_id = fields.StringField()
+    ancestor_region_names = fields.StringField()
+    ancestor_region_ids = fields.StringField()
+    niveau = fields.IntField(default=lambda: -1)
 
 
 class Winery(BaseDocument):
     name = fields.StringField(required=True)
-    country = fields.StringField()
+    country_name = fields.StringField()
     country_id = fields.StringField()
-    region = fields.StringField()
+    region_name = fields.StringField()
     region_id = fields.StringField()
-    win_count = fields.IntField()
-    rating = fields.FloatField()
+    rating_value = fields.FloatField()
+    rating_count = fields.FloatField()
+    address = fields.StringField()
+    websites = fields.ListField(
+        field=fields.StringField)
     description = fields.StringField()
 
 
 class Win(BaseDocument):
     name = fields.StringField(required=True)
     year = fields.StringField()
-    region = fields.StringField()
-    country = fields.StringField()
-    rating = fields.FloatField()
-    rating_distribution = fields.ListField(
-        field=fields.FloatField)
+    country_name = fields.StringField()
+    country_id = fields.StringField()
+    region_name = fields.StringField()
+    region_id = fields.StringField()
+    rating_value = fields.FloatField()
+    rating_count = fields.FloatField()
     price = fields.FloatField()
-    food = fields.ListField(field=fields.StringField)
+    foods = fields.ListField(field=fields.StringField)
+    region_style = fields.StringField()
+    region_style_url = fields.StringField()
+    region_style_description = fields.StringField()
+    grape_names = fields.ListField(field=fields.StringField)
+    grape_ids = fields.ListField(field=fields.StringField)
     description = fields.StringField()
 
 
 class Grape(BaseDocument):
     name = fields.StringField(required=True)
-    origin_region = fields.StringField()
-    origin_country = fields.StringField()
+    description = fields.StringField()
     acidity = fields.FloatField()
     color = fields.FloatField()
     body = fields.FloatField()

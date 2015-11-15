@@ -1,5 +1,4 @@
 import gzip
-import hashlib
 import urllib2
 from StringIO import StringIO
 
@@ -7,15 +6,14 @@ from lxml import etree
 import lxml.html as lh
 
 from winery.apps.vivinocrawler.models import Win
+from winery.apps.vivinocrawler.util import href2id
 
 SITE_MAP_ADDR = 'https://www.vivino.com/sitemap.xml'
-
-HASHER = hashlib.md5()
 
 
 class FetchTask(object):
     content = None
-    status = None 
+    status = None
 
     def __init__(self, url):
         self.url = url
@@ -33,61 +31,223 @@ class FetchTask(object):
         pass
 
 
-class WineryTask(FetchTask):
+class CountryTask(FetchTask):
     def parse(self):
-        name = ''.join(self.tree.xpath('//h1[@itemprop="name"]/text()'))
-        contry = ''.join(
-            self.tree.xpath(
-                '//span[@class="country semi"]'
-                '/meta[@itemprop="addressCountry"]/@content'
-            )
+        url = self.url
+        raw_name = [country.strip() for country
+                    in self.tree.xpath('//h1/text()')]
+        name = ''.join(raw_name)
+        geo_query = ''.join(
+            [query.strip() for query
+             in self.tree.xpath('//*[@id="country-map"]/@data-query')])
+        return Country(
+            url = url,
+            name = name,
+            geo_query = geo_query
         )
-        country_href = ''.join(
-            self.tree.xpath(
-                '//span[@class="country semi"]/a/@href'
-            )
-        )
-        country_id = _compose_parse(addr, country_href)
-        region = ''.join(
-            self.tree.xpath(
-                '//span[@itemprop="addressRegion"]/a/text()'
-            )
-        )
-        region_href = ''.join(
-            self.tree.xpath(
-                '//span[@itemprop="addressRegion"]/a/@href'
-            )
-        )
-        region_id = _compose_parse(addr, region_href)
-        win_count = ''.join(self.tree.xpath(
-            'div[@class="average-price"]/h2/text()'))
-        rating = ''.join(self.tree.xpath(
-            'h2[@itemprop="ratingValue"]/text()'))
-        description = ""
-
-
-class WinTask(FetchTask):
-    pass
 
 
 class RegionTask(FetchTask):
-    pass
+    def parse(self):
+        url = self.url
+        raw_name = [country.strip() for country
+                    in self.tree.xpath('//h1/text()')]
+        name = ''.join(raw_name)
+        geo_query = ''.join(
+            [query.strip() for query
+             in self.tree.xpath('//*[@id="region-map"]/@data-query')])
+
+        name_list = self.tree.xpath(
+            '//div[@class="location"]//li//h3/a/text()')
+
+        id_list = [href2id(href) for href in
+            self.tree.xpath('//div[@class="location"]//li//h3/a/@href')]
+
+        country_name = (name_list and name_list[0]) or ''
+        country_id = (id_list and id_list[0]) or ''
+
+        parent_name = (name_list[1:] and name_list[-1]) or ''
+        parent_id = (id_list[1:] and id_list[-1]) or ''
+
+        ancestor_region_names = '-'.join(name_list)
+        ancestor_region_ids = '-'.join(id_list)
+
+        niveau = len(name_list) or -1
+
+        return Region(
+            url = url,
+            name = name,
+            geo_query = geo_query,
+            country_name = country_name,
+            country_id = country_id,
+            parent_name = parent_name,
+            parent_id = parent_id,
+            ancestor_region_names = ancestor_region_names,
+            ancestor_region_ids = ancestor_region_ids,
+            niveau = niveau
+        )
 
 
-class CountryTask(FetchTask):
-    pass
+class WineryTask(FetchTask):
+    def parse(self):
+        url = self.url
+        raw_name = [country.strip() for country
+                    in self.tree.xpath('//h1/text()')]
+        name = ''.join(raw_name)
+        raw_country_name = self.tree.xpath(
+            '//span[meta/@itemprop="addressCountry"]/a/text()'
+        )
+        country_name = (raw_country_name and raw_country_name[0]) or ''
+        country_id = href2id(''.join(
+            self.tree.xpath(
+                '//span[meta/@itemprop="addressCountry"]/a/@href'
+            )
+        ))
+        raw_region_name = self.tree.xpath(
+            '//span[@itemprop="addressRegion"]/a/text()'
+        )
+        region_name = (raw_region_name and raw_region_name[0]) or ''
+        region_id = href2id(''.join(
+            self.tree.xpath(
+                '//span[@itemprop="addressRegion"]/a/@href'
+            )
+        ))
+        raw_rating = self.tree.xpath(
+            '//*[@itemprop="ratingValue"]/text()')
+        raw_count = self.tree.xpath(
+            '//*[@itemprop="ratingCount"]/@content')
+
+        rating = (raw_rating and float(raw_rating[0].replace(',', '.'))) or -1
+        count = (raw_count and float(raw_count[0].replace(',', '.'))) or -1
+        websites = self.tree.xpath(
+            '/html/body/div[2]/section[1]/div'
+            '/div[3]/div[1]/section[2]/div/div/a/@href')
+
+        address = ''.join(self.tree.xpath(
+            '//*[@itemprop="streetAddress" '
+            'or @itemprop="postalCode" or '
+            '@itemprop="addressLocality"]/text()'))
+
+        description = ""
+
+        return Winery(
+            url = url,
+            name = name,
+            country_name = country_name,
+            country_id = country_id,
+            region_name = region_name,
+            region_id = region_id,
+            rating_value = rating,
+            rating_count = count,
+            address = address,
+            websites = websites,
+            description = description
+        )
+
+
+class WinTask(FetchTask):
+    def parse(self):
+        url = self.url
+        name_list = self.tree.xpath('//h1[@itemprop="name"]/span/text()')
+        name = ' '.join(name_list[:-1])
+        year = name_list[-1]
+        raw_country_name = self.tree.xpath(
+            '//a[@data-item-type="Country"]/text()'
+        )
+        country_name = (raw_country_name and raw_country_name[0]) or ''
+        country_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="Country"]/@href'
+            )
+        ))
+        raw_region_name = self.tree.xpath(
+            '//a[@data-item-type="wine-region"]/text()'
+        )
+        region_name = (raw_region_name and raw_region_name[0]) or ''
+        region_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="wine-region"]/@href'
+            )
+        ))
+        raw_rating = self.tree.xpath(
+            '//*[@data-track-type="wi"]'
+            '//*[@itemprop="aggregateRating"]'
+            '//*[@itemprop="ratingValue"]/text()')
+        raw_count = self.tree.xpath(
+            '//*[@data-track-type="wi"]'
+            '//*[@itemprop="price"]'
+            '//*[@itemprop="ratingCount"]/text()')
+
+        rating = (raw_rating and float(raw_rating[0].replace(',', '.'))) or -1
+        count = (raw_count and float(raw_count[0].replace(',', '.'))) or -1
+
+        raw_price = self.tree.xpath(
+            '//*[@data-track-type="wi"]'
+            '//*[@itemprop="offers"]'
+            '/*[@itemprop="price"]/text()')
+        price = (raw_price and float(raw_price[0].replace(',', '.'))) or -1
+        foods = [food.strip().replace(',', '') for food in self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//span[@data-item-type="food-pairing"]/text()')]
+
+        region_style = ''.join(self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//a[@data-item-type="wine-style"]/text()'))
+        region_style_url = ''.join(self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//a[@data-item-type="wine-style"]/@href'))
+
+        grape_names = self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//a[@data-item-type="grape"]/text()')
+        grape_ids = [href2id(href) for href in self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//a[@data-item-type="grape"]/@href')]
+
+        return Win(
+            url = url,
+            name = name,
+            year = year,
+            country_name = country_name,
+            country_id = country_id,
+            region_name = region_name,
+            region_id = region_id,
+            rating_value = rating,
+            rating_count = count,
+            price = price,
+            foods = foods,
+            region_style = region_style,
+            region_style_url = region_style_url,
+            grape_names = grape_names,
+            grape_ids = grape_ids
+        )
 
 
 class GrapTask(FetchTask):
-    pass
-
-
-def _compose_parse(addr, href):
-    comps = addr.split('/')
-    new_addr = '/'.join(comps[:3]) + href
-    HASHER.update(new_addr)
-    return HASHER.hexdigest()
-
+    def parse(self):
+        name = ''.join(self.tree.xpath(
+            '//h1[@class="grape-name header-mega bold"]/text()'))
+        description = ''.join(self.tree.xpath('//p[@class="lead"]//text()'))
+        try:
+            acidity = float(''.join(self.tree.xpath('//@data-grape-acidity')))
+        except Exception:
+            acidity = -1
+        try:
+            color = float(self.tree.xpath('//@data-grape-color'))
+        except Exception:
+            color = -1
+        try:
+            body = float(self.tree.xpath('//@data-grape-body'))
+        except Exception:
+            body = -1
+        return Grape(
+            url = self.url,
+            name = name,
+            description = description,
+            acidity = acidity,
+            color = color,
+            body = body
+        )
 
 rubs = {}
 
@@ -135,10 +295,19 @@ def _crawl(addr):
             rubs[rub] = 0
         rubs[rub] += 1
         task = None
-#        if rub == 'wineries':
-#            task = WineryTask(addr)
-#        if task:
-#            task.get()
+	if rub == 'wine-countries':
+		task = CountryTask(addr)
+        elif rub == 'wine-regions':
+            task = RegionTask(addr)
+	elif rub == 'wineries':
+            if len(components) > 5 and components[5] == 'wines':
+                task = WineryTask(addr)
+            else:
+                task = WinTask(addr)
+	elif rub == 'grapes':
+            task = GrapTask(addr)
+    if task:
+        task.get()
 
 
 
