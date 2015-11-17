@@ -1,11 +1,19 @@
 from datetime import datetime
-import hashlib
 
 from django.db.models import signals
 import mongoengine
 from mongoengine import fields
 
-HASHER = hashlib.md5()
+from winery.apps.vivinocrawler.util import url2id
+from winery.apps.vivinocrawler.settings import MONGODB_CONFIG
+
+mongoengine.connect(
+    db=MONGODB_CONFIG['db'],
+    username=MONGODB_CONFIG['user'],
+    password=MONGODB_CONFIG['password'],
+    host=MONGODB_CONFIG['host'],
+    port=MONGODB_CONFIG['port']
+)
 
 
 class BaseDocument(mongoengine.Document):
@@ -33,8 +41,7 @@ class BaseDocument(mongoengine.Document):
             # so the value on the saved model is the same as in
             # the MongoDB database.
             self.created_at = datetime.utcnow()
-            HASHER.update(self.url)
-            _id = HASHER.hexdigest()
+            self._id = url2id(self.url)
         self.updated_at = datetime.utcnow()
         result = super(BaseDocument, self).save(**kwargs)
         after = 'pk' in self and self.pk or None
@@ -109,8 +116,7 @@ class Winery(BaseDocument):
     rating_value = fields.FloatField()
     rating_count = fields.FloatField()
     address = fields.StringField()
-    websites = fields.ListField(
-        field=fields.StringField)
+    websites = fields.ListField(fields.StringField())
     description = fields.StringField()
 
 
@@ -124,12 +130,12 @@ class Win(BaseDocument):
     rating_value = fields.FloatField()
     rating_count = fields.FloatField()
     price = fields.FloatField()
-    foods = fields.ListField(field=fields.StringField)
+    foods = fields.ListField(fields.StringField())
     region_style = fields.StringField()
     region_style_url = fields.StringField()
     region_style_description = fields.StringField()
-    grape_names = fields.ListField(field=fields.StringField)
-    grape_ids = fields.ListField(field=fields.StringField)
+    grape_names = fields.ListField(fields.StringField())
+    grape_ids = fields.ListField(fields.StringField())
     description = fields.StringField()
 
 
