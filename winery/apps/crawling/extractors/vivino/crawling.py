@@ -7,76 +7,12 @@ import re
 from lxml import etree
 import lxml.html as lh
 
-from winery.apps.vivinocrawler.models import *
-from winery.apps.vivinocrawler.util import href2id
-
-SITE_MAP_ADDR = 'https://www.vivino.com/sitemap.xml'
+from winery.apps.crawling.extractors.vivino.models import *
+from winery.apps.crawling.extractors.vivino.util import href2id
 
 rubs = {}
 
 chiffre_regex = re.compile(r'[\d,]+')
-
-
-def main():
-    nsp = {'sitemap':'http://www.sitemaps.org/schemas/sitemap/0.9'}
-    top_map = urllib2.urlopen(SITE_MAP_ADDR).read()
-    tree = etree.fromstring(top_map)
-    locs = tree.xpath('//sitemap:loc', namespaces=nsp)
-    print 'Get %d sitemaps' % len(locs)
-    count = 0
-    for loc in locs:
-        print 'crawling sitmap %d with %s' % (count, loc.text)
-        request = urllib2.Request(loc.text)
-        request.add_header('Accept-encoding', 'gzip')
-        try:
-            response = urllib2.urlopen(request)
-        except Exception as e:
-            print e
-            continue
-        if 'gzip' in response.info().get('Content-Type'):
-            try:
-                buf = StringIO(response.read())
-                f = gzip.GzipFile(fileobj=buf)
-                data = f.read()
-            except Exception as e:
-                print e
-                continue
-            url_tree = etree.fromstring(data)
-            print 'get %d page urls' % len(url_tree.getchildren())
-            for url in url_tree.getchildren():
-                for url_loc in url.xpath('sitemap:loc', namespaces=nsp):
-                    addr = url_loc.text
-                    print 'process %s' % addr
-                    _crawl(addr)
-                    #time.sleep(3)
-        count += 1
-        print rubs
-    print rubs
-
-
-def _crawl(addr):
-    components = addr.split('/')
-    if len(components) > 3:
-        rub = components[3]
-        task = None
-        if rub == 'wine-countries':
-            task = CountryTask(addr)
-        elif rub == 'wine-regions':
-            task = RegionTask(addr)
-        elif rub == 'wineries':
-            if len(components) > 5 and components[5] == 'wines':
-                task = WinTask(addr)
-            else:
-                task = WineryTask(addr)
-        elif rub == 'grapes':
-            task = GrapTask(addr)
-    if task:
-        document = task.parse()
-        document.save()
-
-
-if __name__ == '__main__':
-    main()
 
 
 class cached_property(object):
@@ -92,20 +28,13 @@ class cached_property(object):
 
 
 class FetchTask(object):
-    def __init__(self, url):
+    def __init__(self, url, content):
         self.url = url
-
-    def _fetch(self):
-        content = ''
-        try:
-            content = urllib2.urlopen(self.url).read()
-        except urllib2.HTTPError:
-            content = 404
-        return content
+        self.content = content
 
     @cached_property
     def tree(self):
-        return lh.fromstring(self._fetch())
+        return lh.fromstring(self.content)
 
     def parse(self):
         pass

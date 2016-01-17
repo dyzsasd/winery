@@ -4,8 +4,8 @@ from django.db.models import signals
 import mongoengine
 from mongoengine import fields
 
-from winery.apps.vivinocrawler.util import url2id
-from winery.apps.vivinocrawler.settings import MONGODB_CONFIG
+from winery.apps.crawling.extractors.vivino.util import url2id
+from winery.apps.crawling.extractors.vivino.settings import MONGODB_CONFIG
 
 mongoengine.connect(
     db=MONGODB_CONFIG['db'],
