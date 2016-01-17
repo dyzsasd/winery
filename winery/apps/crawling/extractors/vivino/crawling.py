@@ -147,26 +147,28 @@ class WineryTask(FetchTask):
         description = ""
 
         return Winery(
-            url = url,
-            name = name,
-            country_name = country_name,
-            country_id = country_id,
-            region_name = region_name,
-            region_id = region_id,
-            rating_value = rating,
-            rating_count = count,
-            address = address,
-            websites = websites,
-            description = description
+            url=url,
+            name=name,
+            country_name=country_name,
+            country_id=country_id,
+            region_name=region_name,
+            region_id=region_id,
+            rating_value=rating,
+            rating_count=count,
+            address=address,
+            websites=websites,
+            description=description
         )
 
 
 class WinTask(FetchTask):
     def parse(self):
         url = self.url
+
         name_list = self.tree.xpath('//h1[@itemprop="name"]/span/text()')
         name = ' '.join(name_list[:-1])
         year = name_list[-1]
+
         raw_country_name = self.tree.xpath(
             '//a[@data-item-type="Country"]/text()'
         )
@@ -185,6 +187,16 @@ class WinTask(FetchTask):
                 '//a[@data-item-type="wine-region"]/@href'
             )
         ))
+        raw_winery_name = self.tree.xpath(
+            '//a[@data-item-type="winery"]/text()'
+        )
+        winery_name = (raw_winery_name and raw_winery_name[0]) or ''
+        winery_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="winery"]/@href'
+            )
+        ))
+
         raw_rating = [
             chiffre for chiffre_text in
             self.tree.xpath(
@@ -214,16 +226,20 @@ class WinTask(FetchTask):
             for chiffre in chiffre_regex.findall(chiffre_text)
         ]
         price = (raw_price and float(raw_price[0].replace(',', '.'))) or -1
-        foods = [food.strip().replace(',', '') for food in self.tree.xpath(
-            '//div[@class="row wine-information-entry"]'
-            '//span[@data-item-type="food-pairing"]/text()')]
 
-        region_style = ''.join(self.tree.xpath(
+        foods_pairings = [food.strip().replace(',', '') for food in self.tree.xpath(
             '//div[@class="row wine-information-entry"]'
-            '//a[@data-item-type="wine-style"]/text()'))
-        region_style_url = ''.join(self.tree.xpath(
-            '//div[@class="row wine-information-entry"]'
-            '//a[@data-item-type="wine-style"]/@href'))
+            '//*[@data-item-type="food-pairing"]/text()')]
+
+        raw_region_style_name = self.tree.xpath(
+            '//a[@data-item-type="wine-style"]/text()'
+        )
+        region_style_name = (raw_region_style_name and raw_region_style_name[0]) or ''
+        region_style_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="wine-style"]/@href'
+            )
+        ))
 
         grape_names = self.tree.xpath(
             '//div[@class="row wine-information-entry"]'
@@ -233,21 +249,130 @@ class WinTask(FetchTask):
             '//a[@data-item-type="grape"]/@href')]
 
         return Win(
-            url = url,
-            name = name,
-            year = year,
-            country_name = country_name,
-            country_id = country_id,
-            region_name = region_name,
-            region_id = region_id,
-            rating_value = rating,
-            rating_count = count,
-            price = price,
-            foods = foods,
-            region_style = region_style,
-            region_style_url = region_style_url,
-            grape_names = grape_names,
-            grape_ids = grape_ids
+            url=url,
+            name=name,
+            year=year,
+            country_name=country_name,
+            country_id=country_id,
+            region_name=region_name,
+            region_id=region_id,
+            winery_name=winery_name,
+            winery_id=winery_id,
+            rating_value=rating,
+            rating_count=count,
+            price=price,
+            foods_pairings=foods_pairings,
+            region_style_name=region_style_name,
+            region_style_id=region_style_id,
+            grape_names=grape_names,
+            grape_ids=grape_ids
+        )
+
+
+class RegionStyleTask(FetchTask):
+    def parse(self):
+        url = self.url
+
+        name_list = self.tree.xpath('//h1[@itemprop="name"]/span/text()')
+        name = ' '.join(name_list[:-1])
+        year = name_list[-1]
+
+        raw_country_name = self.tree.xpath(
+            '//a[@data-item-type="Country"]/text()'
+        )
+        country_name = (raw_country_name and raw_country_name[0]) or ''
+        country_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="Country"]/@href'
+            )
+        ))
+        raw_region_name = self.tree.xpath(
+            '//a[@data-item-type="wine-region"]/text()'
+        )
+        region_name = (raw_region_name and raw_region_name[0]) or ''
+        region_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="wine-region"]/@href'
+            )
+        ))
+        raw_winery_name = self.tree.xpath(
+            '//a[@data-item-type="winery"]/text()'
+        )
+        winery_name = (raw_winery_name and raw_winery_name[0]) or ''
+        winery_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="winery"]/@href'
+            )
+        ))
+
+        raw_rating = [
+            chiffre for chiffre_text in
+            self.tree.xpath(
+                '//*[@data-track-type="wi"]'
+                '//*[@itemprop="aggregateRating"]'
+                '//*[@itemprop="ratingValue"]/text()')
+            for chiffre in chiffre_regex.findall(chiffre_text)
+        ]
+        raw_count = [
+            chiffre for chiffre_text in
+            self.tree.xpath(
+                '//*[@data-track-type="wi"]'
+                '//*[@itemprop="ratingCount"]/text()')
+            for chiffre in chiffre_regex.findall(chiffre_text)
+        ]
+
+        rating = (raw_rating and float(raw_rating[0].replace(',', '.'))) or -1
+        count = (raw_count and float(raw_count[0].replace(',', '.'))) or -1
+
+        raw_price = [
+            chiffre for chiffre_text in
+            self.tree.xpath(
+                '//*[@data-track-type="wi"]'
+                '//*[@itemprop="offers"]'
+                '/*[@itemprop="price"]/text()')
+            for chiffre in chiffre_regex.findall(chiffre_text)
+        ]
+        price = (raw_price and float(raw_price[0].replace(',', '.'))) or -1
+
+        foods_pairings = [food.strip().replace(',', '') for food in self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//span[@data-item-type="food-pairing"]/text()')]
+
+        raw_region_style_name = self.tree.xpath(
+            '//a[@data-item-type="wine-style"]/text()'
+        )
+        region_style_name = (raw_region_style_name and raw_region_style_name[0]) or ''
+        region_style_id = href2id(''.join(
+            self.tree.xpath(
+                '//a[@data-item-type="wine-style"]/@href'
+            )
+        ))
+
+        grape_names = self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//a[@data-item-type="grape"]/text()')
+        grape_ids = [href2id(href) for href in self.tree.xpath(
+            '//div[@class="row wine-information-entry"]'
+            '//a[@data-item-type="grape"]/@href')]
+
+        return Win(
+            url=url,
+            name=name,
+            year=year,
+            country_name=country_name,
+            country_id=country_id,
+            region_name=region_name,
+            region_id=region_id,
+            winery_name=winery_name,
+            winery_id=winery_id,
+            rating_value=rating,
+            rating_count=count,
+            price=price,
+            foods_pairings=foods_pairings,
+            region_style_name=region_style_name,
+            region_style_id=region_style_id,
+            grape_names=grape_names,
+            grape_ids=grape_ids
         )
 
 
