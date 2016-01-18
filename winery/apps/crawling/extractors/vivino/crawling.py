@@ -49,11 +49,10 @@ class CountryTask(FetchTask):
         geo_query = ''.join(
             [query.strip() for query
              in self.tree.xpath('//*[@id="country-map"]/@data-query')])
-        print name
         return Country(
-            url = url,
-            name = name,
-            geo_query = geo_query
+            url=url,
+            name=name,
+            geo_query=geo_query
         )
 
 
@@ -70,8 +69,11 @@ class RegionTask(FetchTask):
         name_list = self.tree.xpath(
             '//div[@class="location"]//li//h3/a/text()')
 
-        id_list = [href2id(href) for href in
-            self.tree.xpath('//div[@class="location"]//li//h3/a/@href')]
+        id_list = [
+            href2id(href)
+            for href in self.tree.xpath(
+                '//div[@class="location"]//li//h3/a/@href')
+        ]
 
         country_name = (name_list and name_list[0]) or ''
         country_id = (id_list and id_list[0]) or ''
@@ -79,22 +81,22 @@ class RegionTask(FetchTask):
         parent_name = (name_list[1:] and name_list[-1]) or ''
         parent_id = (id_list[1:] and id_list[-1]) or ''
 
-        ancestor_region_names = '-'.join(name_list)
-        ancestor_region_ids = '-'.join(id_list)
+        ancestor_region_names = '/'.join(name_list)
+        ancestor_region_ids = '/'.join(id_list)
 
         niveau = len(name_list) or -1
 
         return Region(
-            url = url,
-            name = name,
-            geo_query = geo_query,
-            country_name = country_name,
-            country_id = country_id,
-            parent_name = parent_name,
-            parent_id = parent_id,
-            ancestor_region_names = ancestor_region_names,
-            ancestor_region_ids = ancestor_region_ids,
-            niveau = niveau
+            url=url,
+            name=name,
+            geo_query=geo_query,
+            country_name=country_name,
+            country_id=country_id,
+            parent_name=parent_name,
+            parent_id=parent_id,
+            ancestor_region_names=ancestor_region_names,
+            ancestor_region_ids=ancestor_region_ids,
+            niveau=niveau
         )
 
 
@@ -114,11 +116,13 @@ class WineryTask(FetchTask):
             )
         ))
         raw_region_name = self.tree.xpath(
+            '//section[@class="main-content-section winery-information"]'
             '//span[@itemprop="addressRegion"]/a/text()'
         )
         region_name = (raw_region_name and raw_region_name[0]) or ''
         region_id = href2id(''.join(
             self.tree.xpath(
+                '//section[@class="main-content-section winery-information"]'
                 '//span[@itemprop="addressRegion"]/a/@href'
             )
         ))
@@ -139,10 +143,12 @@ class WineryTask(FetchTask):
             '/html/body/div[2]/section[1]/div'
             '/div[3]/div[1]/section[2]/div/div/a/@href')
 
-        address = ''.join(self.tree.xpath(
+        address = '\n'.join(self.tree.xpath(
             '//*[@itemprop="streetAddress" '
             'or @itemprop="postalCode" or '
             '@itemprop="addressLocality"]/text()'))
+
+        win_maker = ''.join(self.tree.xpath('//*[@class="semi winemaker"]/text()'))
 
         description = ""
 
@@ -157,6 +163,7 @@ class WineryTask(FetchTask):
             rating_count=count,
             address=address,
             websites=websites,
+            win_maker=win_maker,
             description=description
         )
 
@@ -273,106 +280,74 @@ class RegionStyleTask(FetchTask):
     def parse(self):
         url = self.url
 
-        name_list = self.tree.xpath('//h1[@itemprop="name"]/span/text()')
-        name = ' '.join(name_list[:-1])
-        year = name_list[-1]
+        name_list = self.tree.xpath(
+            '//div[@class="wine-style-main-content"]/h1/span//text()')
+        name = ' '.join(name_list)
 
         raw_country_name = self.tree.xpath(
-            '//a[@data-item-type="Country"]/text()'
+            '//div[@class="row wine-style-area"]/div[h5/text()="Country"]//a/text()'
         )
         country_name = (raw_country_name and raw_country_name[0]) or ''
         country_id = href2id(''.join(
             self.tree.xpath(
-                '//a[@data-item-type="Country"]/@href'
+                '//div[@class="row wine-style-area"]/div[h5/text()="Country"]//a/@href'
             )
         ))
         raw_region_name = self.tree.xpath(
-            '//a[@data-item-type="wine-region"]/text()'
+            '//div[@class="row wine-style-area"]/div[h5/text()="Region"]//a/text()'
         )
         region_name = (raw_region_name and raw_region_name[0]) or ''
         region_id = href2id(''.join(
             self.tree.xpath(
-                '//a[@data-item-type="wine-region"]/@href'
-            )
-        ))
-        raw_winery_name = self.tree.xpath(
-            '//a[@data-item-type="winery"]/text()'
-        )
-        winery_name = (raw_winery_name and raw_winery_name[0]) or ''
-        winery_id = href2id(''.join(
-            self.tree.xpath(
-                '//a[@data-item-type="winery"]/@href'
+                '//div[@class="row wine-style-area"]/div[h5/text()="Region"]//a/@href'
             )
         ))
 
-        raw_rating = [
-            chiffre for chiffre_text in
-            self.tree.xpath(
-                '//*[@data-track-type="wi"]'
-                '//*[@itemprop="aggregateRating"]'
-                '//*[@itemprop="ratingValue"]/text()')
-            for chiffre in chiffre_regex.findall(chiffre_text)
+        foods_pairings = [
+            food.strip().replace(',', '') for food in self.tree.xpath(
+                '//div[@class="wine-information-item" and h3/text()="Food Pairing"]'
+                '//li/text()'
+            ) if re.findall(r'\w+', food)
         ]
-        raw_count = [
-            chiffre for chiffre_text in
-            self.tree.xpath(
-                '//*[@data-track-type="wi"]'
-                '//*[@itemprop="ratingCount"]/text()')
-            for chiffre in chiffre_regex.findall(chiffre_text)
-        ]
-
-        rating = (raw_rating and float(raw_rating[0].replace(',', '.'))) or -1
-        count = (raw_count and float(raw_count[0].replace(',', '.'))) or -1
-
-        raw_price = [
-            chiffre for chiffre_text in
-            self.tree.xpath(
-                '//*[@data-track-type="wi"]'
-                '//*[@itemprop="offers"]'
-                '/*[@itemprop="price"]/text()')
-            for chiffre in chiffre_regex.findall(chiffre_text)
-        ]
-        price = (raw_price and float(raw_price[0].replace(',', '.'))) or -1
-
-        foods_pairings = [food.strip().replace(',', '') for food in self.tree.xpath(
-            '//div[@class="row wine-information-entry"]'
-            '//span[@data-item-type="food-pairing"]/text()')]
-
-        raw_region_style_name = self.tree.xpath(
-            '//a[@data-item-type="wine-style"]/text()'
-        )
-        region_style_name = (raw_region_style_name and raw_region_style_name[0]) or ''
-        region_style_id = href2id(''.join(
-            self.tree.xpath(
-                '//a[@data-item-type="wine-style"]/@href'
-            )
-        ))
 
         grape_names = self.tree.xpath(
-            '//div[@class="row wine-information-entry"]'
-            '//a[@data-item-type="grape"]/text()')
+            '//div[@class="wine-information-item" and h3/text()="Grapes"]'
+            '//a/text()'
+        )
         grape_ids = [href2id(href) for href in self.tree.xpath(
-            '//div[@class="row wine-information-entry"]'
-            '//a[@data-item-type="grape"]/@href')]
+            '//div[@class="wine-information-item" and h3/text()="Grapes"]'
+            '//a/@href')]
 
-        return Win(
+        try:
+            acidity = float(''.join(self.tree.xpath(
+                '//div[@class="wine-information-item" and h3/text()="Acidity"]'
+                '//figure/@data-grape-acidity')))
+        except Exception:
+            acidity = -1.0
+
+        try:
+            body = float(self.tree.xpath(
+                '//div[@class="wine-information-item" and h3/text()="Body"]'
+                '//figure/@data-grape-body'))
+        except Exception:
+            body = -1.0
+
+        description = ''.join(self.tree.xpath(
+            '//div[@class="wine-style-description row visible-xs"]//text()'))
+
+        return RegionStyle(
             url=url,
             name=name,
-            year=year,
             country_name=country_name,
             country_id=country_id,
             region_name=region_name,
             region_id=region_id,
-            winery_name=winery_name,
-            winery_id=winery_id,
-            rating_value=rating,
-            rating_count=count,
-            price=price,
-            foods_pairings=foods_pairings,
-            region_style_name=region_style_name,
-            region_style_id=region_style_id,
+            food_pairings=foods_pairings,
             grape_names=grape_names,
-            grape_ids=grape_ids
+            grape_ids=grape_ids,
+            body=body,
+            acidity=acidity,
+            description=description
         )
 
 
@@ -380,24 +355,32 @@ class GrapTask(FetchTask):
     def parse(self):
         name = ''.join(self.tree.xpath(
             '//h1[@class="grape-name header-mega bold"]/text()'))
-        description = ''.join(self.tree.xpath('//p[@class="lead"]//text()'))
+        description = ''.join(self.tree.xpath('//div[p[@class="lead"]]//text()'))
+        foods_pairings = [
+            food.strip().replace(',', '') for food in self.tree.xpath(
+                '//section[@class="section-bordered section-md"]'
+                '/div[h2[@class="section-title"]="Food Pairing"]'
+                '//li/text()'
+            ) if re.findall(r'\w+', food)
+        ]
         try:
             acidity = float(''.join(self.tree.xpath('//@data-grape-acidity')))
         except Exception:
-            acidity = -1
+            acidity = -1.0
         try:
-            color = float(self.tree.xpath('//@data-grape-color'))
+            color = float(''.join(self.tree.xpath('//@data-grape-color')))
         except Exception:
-            color = -1
+            color = -1.0
         try:
-            body = float(self.tree.xpath('//@data-grape-body'))
+            body = float(''.join(self.tree.xpath('//@data-grape-body')))
         except Exception:
-            body = -1
+            body = -1.0
         return Grape(
-            url = self.url,
-            name = name,
-            description = description,
-            acidity = acidity,
-            color = color,
-            body = body
+            url=self.url,
+            name=name,
+            foods_pairings=foods_pairings,
+            description=description,
+            acidity=acidity,
+            color=color,
+            body=body
         )

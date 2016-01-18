@@ -117,6 +117,7 @@ class Winery(BaseDocument):
     rating_count = fields.FloatField()
     address = fields.StringField()
     websites = fields.ListField(fields.StringField())
+    win_maker = fields.StringField()
     description = fields.StringField()
 
 
@@ -146,7 +147,7 @@ class Win(BaseDocument):
     description = fields.StringField()
 
 
-class WinStyle(BaseDocument):
+class RegionStyle(BaseDocument):
     name = fields.StringField(required=True)
 
     country_name = fields.StringField()
@@ -154,22 +155,22 @@ class WinStyle(BaseDocument):
     region_name = fields.StringField()
     region_id = fields.StringField()
 
-    food_pairing = fields.ListField(fields.StringField())
+    food_pairings = fields.ListField(fields.StringField())
 
     grape_names = fields.ListField(fields.StringField())
     grape_ids = fields.ListField(fields.StringField())
 
-    body = fields.StringField()
+    body = fields.FloatField()
 
-    acidity = fields.StringField()
+    acidity = fields.FloatField()
 
     description = fields.StringField()
-
 
 
 class Grape(BaseDocument):
     name = fields.StringField(required=True)
-    description = fields.StringField()
     acidity = fields.FloatField()
     color = fields.FloatField()
     body = fields.FloatField()
+    food_pairings = fields.ListField(fields.StringField())
+    description = fields.StringField()

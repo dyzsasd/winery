@@ -18,6 +18,8 @@ class VivinoPipeline(object):
                     task = WineryTask(item['url'], item['content'])
             elif rub == 'grapes':
                 task = GrapTask(item['url'], item['content'])
+            elif rub == 'wine-styles':
+                task = RegionStyleTask(item['url'], item['content'])
         if task:
             document = task.parse()
             document.save()
